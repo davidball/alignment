@@ -164,11 +164,18 @@ def get_best_paths(g, into_node_key):
 
 # draw a small arrows in each cell indicating the direction from which
 # the best path(s) came
-def draw_traceback_indices(g, positions, seq1, seq2, cell_size, movie=None):
-    hfont = {'fontname': 'Wingdings 3', 'fontsize': '14'}
+def draw_traceback_indices(g, positions, seq1, seq2, cell_size):
     for j in range(0, len(seq1)+1):
         for k in range(0, len(seq2)+1):
-            pos = positions[(j, k)]
+            node = g.node[(j, k)]
+            if "arrows" in node:
+                draw_traceback_arrow(node["arrows"],
+                                     cell_size, positions[(j, k)])
+
+
+def get_traceback_arrow_codes(g, seq1, seq2):
+    for j in range(0, len(seq1)+1):
+        for k in range(0, len(seq2)+1):
             node = g.node[(j, k)]
             if 'best_predecessors' in node:
                 pred = node['best_predecessors']
@@ -182,33 +189,15 @@ def draw_traceback_indices(g, positions, seq1, seq2, cell_size, movie=None):
                         if p[0] == j-1 and p[1] == k-1:
                             arrows += "j"  # in Wingdings 3 f is NW arrow
                     if len(arrows) > 0:
-                        plt.text(pos[0] - cell_size * 0.45 , pos[1] +  cell_size * 0.65, s = arrows, **hfont, color = "m")
-                        if movie != None:
-                            plt.savefig(movie.nextImagePath())
-
-def get_traceback_arrow_codes(g, seq1, seq2):
-    for j in range(0, len(seq1)+1):
-        for k in range(0, len(seq2)+1):
-            node = g.node[(j, k)]
-            if 'best_predecessors' in node:
-                pred = node['best_predecessors']
-                if len(pred)>0:
-                    arrows = ""
-                    for p in pred:
-                        if p[0] == j and p[1] == k-1:
-                            arrows+= "h" # in Wingdings 3 h is up arrow
-                        if p[0] == j-1 and p[1] == k:
-                            arrows+= "f" # in Wingdings 3 f is left arrow
-                        if p[0] == j-1 and p[1] == k-1:
-                            arrows+= "j" # in Wingdings 3 f is NW arrow
-                    if len(arrows)>0:
                         node["arrows"] = arrows
 
-def draw_traceback_arrow(wingdingText, cell_size, pos, movie = None):
-    hfont = {'fontname':'Wingdings 3', 'fontsize':'14'}
-    if len(wingdingText)>0:
-        plt.text(pos[0] - cell_size * 0.45 , pos[1] +  cell_size * 0.65, s = wingdingText, **hfont, color = "m")
-        if movie != None:
+
+def draw_traceback_arrow(wingdingText, cell_size, pos, movie=None):
+    hfont = {'fontname': 'Wingdings 3', 'fontsize': '14'}
+    if len(wingdingText) > 0:
+        plt.text(pos[0] - cell_size * 0.45, pos[1] + cell_size * 0.65,
+                 s=wingdingText, **hfont, color="m")
+        if movie is not None:
             plt.savefig(movie.nextImagePath())
 
 
@@ -227,57 +216,66 @@ def draw_alignment_grid(g, seq1, seq2, filename="alignment.png", plot=False):
     origin_position = positions[(0, 0)]
 
     for r in range(0, len(seq1)):
-        plt.text(origin_position[0] + r * cell_size + cell_size/2, origin_position[1] +cell_size, s = seq1[r], bbox = dict(facecolor = 'red', alpha=0.5), horizontalalignment= 'center')
+        plt.text(origin_position[0] + r * cell_size + cell_size/2,
+                 origin_position[1] + cell_size, s=seq1[r],
+                 bbox=dict(facecolor='red', alpha=0.5),
+                 horizontalalignment='center')
 
     for r in range(0, len(seq2)):
-        plt.text(origin_position[0] - cell_size, origin_position[1]- r*cell_size - cell_size/2, s=seq2[r], bbox=dict(facecolor= 'red', alpha= 0.5), horizontalalignment= 'center')
+        plt.text(origin_position[0] - cell_size,
+                 origin_position[1] - r*cell_size - cell_size/2,
+                 s=seq2[r], bbox=dict(facecolor='red', alpha=0.5),
+                 horizontalalignment='center')
 
-
-    labels = {key:data['best_score'] for key, data in g.nodes(data=True) }
+    labels = {key: data['best_score'] for key, data in g.nodes(data=True)}
     if movieMode:
-        nx.draw_networkx(g, pos=positions, labels={}, node_color="lightblue")
+        nx.draw_networkx(g, pos=positions, labels={},
+                         node_color="lightblue")
     else:
-        nx.draw_networkx(g, pos=positions, labels=labels, node_color="lightblue")
+        nx.draw_networkx(g, pos=positions, labels=labels,
+                         node_color="lightblue")
 
     plt.savefig(movie.nextImagePath())
-
 
     labels = nx.get_edge_attributes(g, 'weight')
 
-    nx.draw_networkx_edge_labels(g, pos = edge_positions, edge_labels = labels, font_size = 7)
+    nx.draw_networkx_edge_labels(g, pos=edge_positions, edge_labels=labels,
+                                 font_size=7)
 
     plt.savefig(movie.nextImagePath())
 
+    get_traceback_arrow_codes(g, seq1, seq2)
+
     if movieMode:
-        get_traceback_arrow_codes(g, seq1, seq2)
         for k in range(len(seq2)+1):
             for j in range(len(seq1)+1):
                 n = g.node[(j, k)]
-                nx.draw_networkx_labels(g, pos=positions, labels={(j, k):n["best_score"]})
+                nx.draw_networkx_labels(g, pos=positions,
+                                        labels={(j, k): n["best_score"]})
                 if "arrows" in n:
-                    draw_traceback_arrow(n["arrows"], cell_size, positions[(j, k)])
+                    draw_traceback_arrow(n["arrows"], cell_size,
+                                         positions[(j, k)])
                 plt.savefig(movie.nextImagePath())
 
     else:
-        draw_traceback_indices(g, positions, seq1, seq2, cell_size) # , movie)
+        draw_traceback_indices(g, positions, seq1, seq2, cell_size)
 
     plt.savefig(movie.nextImagePath())
-
 
     plt.savefig(movie.nextImagePath())
 
     best_path_edges = get_edges_in_best_paths(g, (len(seq1), len(seq2)))
 
-
-
     if movieMode:
         sorted_best_edges = sorted(best_path_edges)
         sorted_best_edges.reverse()
         for edge in sorted_best_edges:
-            nx.draw_networkx_edges(g, pos = positions, edgelist=[edge], edge_color="r", width=8, alpha=0.5)
+            nx.draw_networkx_edges(g, pos=positions, edgelist=[edge],
+                                   edge_color="r", width=8, alpha=0.5)
             plt.savefig(movie.nextImagePath())
     else:
-        nx.draw_networkx_edges(g, pos=positions, edgelist=best_path_edges, edge_color="r", width=8, alpha=0.5)
+        nx.draw_networkx_edges(g, pos=positions, edgelist=best_path_edges,
+                               edge_color="r", width=8, alpha=0.5)
     plt.savefig(movie.nextImagePath())
 
     plt.savefig(filename)
