@@ -1,6 +1,6 @@
 import networkx as nx
 import matplotlib.pyplot as plt
-from os import system
+from moviemaker import MovieMaker
 
 amino_acids = {'C', 'A', 'G', 'C', 'V', 'T', 'I', 'L', 'M', 'F', 'Y', 'W', 'H',
                'K', 'S', 'P', 'N', 'D', 'E', 'R', 'Q'}
@@ -14,20 +14,6 @@ polar = {'K', 'H', 'R', 'D', 'E', 'Q', 'W', 'Y', 'T', 'C', 'S', 'N'}
 charged = {'K', 'H', 'R', 'D', 'E'}
 charged_pos = {'H', 'K', 'R'}
 charged_neg = {'D', 'E'}
-
-
-class MovieMaker:
-    def __init__(self, filePrefix, imageIndexDigits=4):
-        self.imageIndex = 0
-        self.filePrefix = filePrefix
-        self.imageIndexDigits = imageIndexDigits
-
-    def nextImagePath(self):
-        strIndex = str(self.imageIndex)
-        while len(strIndex) < self.imageIndexDigits:
-            strIndex = "0" + strIndex
-        self.imageIndex += 1
-        return self.filePrefix + strIndex+".png"
 
 
 # precompute a dictionary of residue mappings
@@ -201,20 +187,7 @@ def draw_traceback_arrow(wingdingText, cell_size, pos, movie=None):
             plt.savefig(movie.nextImagePath())
 
 
-def draw_alignment_grid(g, seq1, seq2, filename="alignment.png", plot=False):
-
-    movieMode = True
-    cell_size = 10
-    positions = get_positions(len(seq1)+1, len(seq2)+1, cell_size)
-    edge_positions = positions
-
-    plt.rcParams['figure.figsize'] = (12.0, 10.0)
-
-    plt.axis('off')
-
-    movie = MovieMaker("output/" + filename + ".")
-    origin_position = positions[(0, 0)]
-
+def draw_sequence_letters(origin_position, cell_size, seq1, seq2):
     for r in range(0, len(seq1)):
         plt.text(origin_position[0] + r * cell_size + cell_size/2,
                  origin_position[1] + cell_size, s=seq1[r],
@@ -227,26 +200,42 @@ def draw_alignment_grid(g, seq1, seq2, filename="alignment.png", plot=False):
                  s=seq2[r], bbox=dict(facecolor='red', alpha=0.5),
                  horizontalalignment='center')
 
-    labels = {key: data['best_score'] for key, data in g.nodes(data=True)}
-    if movieMode:
-        nx.draw_networkx(g, pos=positions, labels={},
-                         node_color="lightblue")
-    else:
-        nx.draw_networkx(g, pos=positions, labels=labels,
-                         node_color="lightblue")
 
-    plt.savefig(movie.nextImagePath())
+def draw_alignment_grid(g, seq1, seq2, filename="alignment.png",
+                        plot=False,
+                        movie=None):
+
+    cell_size = 10
+    positions = get_positions(len(seq1)+1, len(seq2)+1, cell_size)
+    edge_positions = positions
+
+    plt.rcParams['figure.figsize'] = (12.0, 10.0)
+
+    plt.axis('off')
+
+    draw_sequence_letters(positions[(0, 0)], cell_size, seq1, seq2)
+
+    labels = {key: data['best_score'] for key, data in g.nodes(data=True)}
+
+    # if a movie is being generated we must draw the nodes
+    # without labels at this point
+    # otherwise go ahead and show the scores
+    nx.draw_networkx(g, pos=positions,
+                     labels=({} if movie.enabled else labels),
+                     node_color="lightblue")
+
+    movie.saveFrame()
 
     labels = nx.get_edge_attributes(g, 'weight')
 
     nx.draw_networkx_edge_labels(g, pos=edge_positions, edge_labels=labels,
                                  font_size=7)
 
-    plt.savefig(movie.nextImagePath())
+    movie.saveFrame()
 
     get_traceback_arrow_codes(g, seq1, seq2)
 
-    if movieMode:
+    if movie.enabled:
         for k in range(len(seq2)+1):
             for j in range(len(seq1)+1):
                 n = g.node[(j, k)]
@@ -260,25 +249,27 @@ def draw_alignment_grid(g, seq1, seq2, filename="alignment.png", plot=False):
     else:
         draw_traceback_indices(g, positions, seq1, seq2, cell_size)
 
-    plt.savefig(movie.nextImagePath())
+    movie.saveFrame()
 
-    plt.savefig(movie.nextImagePath())
+    movie.saveFrame()
 
     best_path_edges = get_edges_in_best_paths(g, (len(seq1), len(seq2)))
 
-    if movieMode:
+    if movie.enabled:
         sorted_best_edges = sorted(best_path_edges)
         sorted_best_edges.reverse()
         for edge in sorted_best_edges:
             nx.draw_networkx_edges(g, pos=positions, edgelist=[edge],
                                    edge_color="r", width=8, alpha=0.5)
-            plt.savefig(movie.nextImagePath())
+            movie.saveFrame()
     else:
         nx.draw_networkx_edges(g, pos=positions, edgelist=best_path_edges,
                                edge_color="r", width=8, alpha=0.5)
-    plt.savefig(movie.nextImagePath())
+
+    movie.saveFrame()
 
     plt.savefig(filename)
+
     if plot:
         plt.show()
 
@@ -311,10 +302,9 @@ def map_alignments(g, seq1, seq2):
     return alignments
 
 
-def display_alignments(g, seq1, seq2):
-    r = map_alignments(g, seq1, seq2)
+def display_alignments(seq1, seq2, alignments):
 
-    l = len(r)
+    l = len(alignments)
     if l > 1:
         plural = "s"
     else:
@@ -322,36 +312,44 @@ def display_alignments(g, seq1, seq2):
 
     print("%d best path%s found:" % (l, plural))
     print()
-    for a in r:
+    for a in alignments:
         print(a[0])
         print(a[1])
         print()
 
 
-def align_and_display(seq1, seq2, filename="", plot=False):
+def narration_text(seq1, seq2, alignments):
+    narration = "This animation shows the alignment of sequences " + " ".join(
+         [a for a in seq1]) + " and " + " ".join([a for a in seq2]) + ". "
+    narration += "Dynamic programming is used to calculate the best route " \
+                 "from the origin to each node. The arrows " \
+                 "indicate the source of the optimal path for that node. " \
+                 "Optimal alignments are found by following those traceback " \
+                 "arrows from the final sink back to the origin. "
+
+    narration += ("In this particular case, " +
+                  str(len(alignments)) +
+                  " alignments are equally good.")
+
+    return narration
+
+
+def align_and_display(seq1, seq2, filename="", plot=False, make_movie=True):
+
+    movie = MovieMaker("output/" + filename + ".", enabled=make_movie)
+
     g = create_alignment_digraph(seq1, seq2)
 
-    draw_alignment_grid(g, seq1, seq2, filename, plot)
+    draw_alignment_grid(g, seq1, seq2, filename, plot, movie)
 
-    display_alignments(g, seq1, seq2)
+    alignments = map_alignments(g, seq1, seq2)
+
+    display_alignments(seq1, seq2, alignments)
+
+    if make_movie:
+        narration = narration_text(seq1, seq2, alignments)
+        movie.createAudioFile("output/narration", narration)
+        movie.save(seq1 + "." + seq2 + ".png.",
+                   "theoutput", 3, "output/narration.aiff")
 
     return g
-
-
-def createAudioFile(outputName, text):
-    print("deprecate createAudio to environment object method")
-    # Alex", Vicki, Victoria, Zarvox
-    cmd = "say -o " + outputName + ".aiff " + text
-    system(cmd)
-
-
-def saveMovie(inputPrefix, outputPrefix, frameRate="3", audioFile=None):
-    # todo strip unsafe chars out of input and output prefix
-    cmd = ("ffmpeg -framerate " + str(frameRate) +
-           " -i output/" + inputPrefix + "%04d.png")
-
-    if audioFile is not None:
-        cmd += " -i " + audioFile
-    cmd += " -c:v mpeg4 -pix_fmt yuv420p output/"+outputPrefix + ".mp4"
-    print(cmd)
-    system(cmd)
