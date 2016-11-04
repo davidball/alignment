@@ -17,5 +17,6 @@ generate_movie = True
 g = dpalign.align_and_display(seq1, seq2, seq1 + "." + seq2 + ".png",
                               show_plot, generate_movie)
 
-print("Image saved to " + seq1 + "." + seq2 + ".png")
+print("Image saved to output/" + seq1 + "." + seq2 + ".png")
+print("Movie saved to output/" + seq1 + "." + seq2 + ".mp4")
 

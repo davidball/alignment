@@ -350,6 +350,6 @@ def align_and_display(seq1, seq2, filename="", plot=False, make_movie=True):
         narration = narration_text(seq1, seq2, alignments)
         movie.createAudioFile("output/narration", narration)
         movie.save(seq1 + "." + seq2 + ".png.",
-                   "theoutput", 3, "output/narration.aiff")
+                   seq1 + "." + seq2, 3, "output/narration.aiff")
 
     return g
