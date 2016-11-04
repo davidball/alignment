@@ -1,0 +1,1 @@
+#this file is just here to give the cloned git repo an "output" directory as it is the default location for generated images and videos
