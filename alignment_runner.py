@@ -14,7 +14,8 @@ print("Aligning %s and %s" % (seq1, seq2))
 
 show_plot = False
 generate_movie = True
-g = dpalign.align_and_display(seq1, seq2, seq1 + "." + seq2 + ".png",
+aligner = dpalign.AlignmentGraph()
+g = aligner.align_and_display(seq1, seq2, seq1 + "." + seq2 + ".png",
                               show_plot, generate_movie)
 
 print("Image saved to output/" + seq1 + "." + seq2 + ".png")
